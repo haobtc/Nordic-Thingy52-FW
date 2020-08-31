@@ -134,6 +134,7 @@
 
 #define NO_CHARGE                       0
 #define USB_CHARGE                      1
+#define ERROR_STA						2
 
 #define INIT_VALUE                      0
 #define AUTH_VALUE                      1
@@ -150,7 +151,7 @@
 
 #define RCV_DATA_TIMEOUT_INTERVAL       APP_TIMER_TICKS(100)
 #define BATTERY_LEVEL_MEAS_INTERVAL     APP_TIMER_TICKS(1000)                      /**< Battery level measurement interval (ticks). */
-#define BATTERY_MEAS_LONG_INTERVAL      APP_TIMER_TICKS(120000) 
+#define BATTERY_MEAS_LONG_INTERVAL      APP_TIMER_TICKS(5000) 
 #define MIN_BATTERY_LEVEL               81                                          /**< Minimum battery level as returned by the simulated measurement function. */
 #define MAX_BATTERY_LEVEL               100                                         /**< Maximum battery level as returned by the simulated measurement function. */
 #define BATTERY_LEVEL_INCREMENT         1                                           /**< Value by which the battery level is incremented/decremented for each call to the simulated measurement function. */
@@ -584,18 +585,46 @@ static void saadc_event_handler(nrf_drv_saadc_evt_t const * p_evt)
             adc_result = 1024;
         }        
 		usb_ins_flag = nrf_gpio_pin_read(USB_INS_PIN);
+		if(usb_ins_flag)
+		{
+			NRF_LOG_INFO("Usb charge mode.");
+		}
 		
         err_code = nrf_drv_saadc_buffer_convert(p_evt->data.done.p_buffer,1);
         APP_ERROR_CHECK(err_code);
         m_batt_lvl_in_milli_volts = ADC_RESULT_IN_MILLI_VOLTS(adc_result);		
-		
+		NRF_LOG_INFO("m_batt_lvl_in_milli_volts is %u mV",m_batt_lvl_in_milli_volts);
+
         if(m_last_volts == 0)
         {
-            m_last_volts = m_batt_lvl_in_milli_volts;
+        	NRF_LOG_INFO("m_last_volts----0");        	
+	        if(m_batt_lvl_in_milli_volts> 2000 && m_batt_lvl_in_milli_volts<3500)
+	        {
+            	m_last_volts = m_batt_lvl_in_milli_volts;
+            	NRF_LOG_INFO("-2 voltage is   %u mV",m_batt_lvl_in_milli_volts);
+            }else
+            {
+            	NRF_LOG_INFO("-3 voltage is 0 mV");
+            	m_last_volts = 0;
+            	usb_ins_flag = ERROR_STA;
+            }
+            if(usb_ins_flag == USB_CHARGE)
+	        {        				
+	        	m_batt_lvl_in_milli_volts -= 100;
+	        	NRF_LOG_INFO("-1 voltage is  %u mV",m_batt_lvl_in_milli_volts);
+	        }
+            
         }
-        
         if(usb_ins_flag == USB_CHARGE)
-        {        				
+        {        			
+        	if(m_batt_lvl_in_milli_volts > 2000 && m_batt_lvl_in_milli_volts < 3500)
+        	{
+        		m_batt_lvl_in_milli_volts -= 100;
+        	}else
+        	{
+				m_batt_lvl_in_milli_volts = m_last_volts;
+        	}
+        	
 			if(m_batt_lvl_in_milli_volts > m_last_volts)
             {
                 m_last_volts = m_batt_lvl_in_milli_volts;
@@ -613,12 +642,15 @@ static void saadc_event_handler(nrf_drv_saadc_evt_t const * p_evt)
 			NRF_LOG_INFO("charge adc is %u mV",m_last_volts);
 			NRF_LOG_INFO("bat_level_to_st is %d",bat_level_to_st);
 			count_usb_ins++;
-			if((0 == bat_level_to_st)||(1 == bat_level_to_st))
+			if(0 == bat_level_to_st)
 			{
-				charge_time = 5;
+				charge_time = 60; //5 minuts
+			}else if(1 == bat_level_to_st)
+			{
+				charge_time = 240; //20 minuts
 			}else if((2 == bat_level_to_st)||(3 == bat_level_to_st))
 			{
-				charge_time = 10;
+				charge_time = 300; //25 minutes
 			}
 			
 			if(count_usb_ins>charge_time)  
@@ -634,12 +666,24 @@ static void saadc_event_handler(nrf_drv_saadc_evt_t const * p_evt)
 		else if(usb_ins_flag == NO_CHARGE)
         {   
         	count_usb_ins = 0;
-			
-            if(m_batt_lvl_in_milli_volts < m_last_volts)
-            {
-                m_last_volts = m_batt_lvl_in_milli_volts;
-            }
-			
+
+			if(power_change_flag == 1)
+			{
+				m_last_volts = m_batt_lvl_in_milli_volts;
+			}
+			else
+			{
+				if(m_batt_lvl_in_milli_volts < 3000)
+	            {
+					m_last_volts = m_batt_lvl_in_milli_volts;
+	            }else if(m_batt_lvl_in_milli_volts < m_last_volts)
+	            {
+	            	if(m_last_volts - m_batt_lvl_in_milli_volts <40)
+	            	{
+	                	m_last_volts = m_batt_lvl_in_milli_volts;
+	                }
+	            }
+			}				
 			NRF_LOG_INFO("no charge adc is %u mV",m_last_volts);
 			NRF_LOG_INFO("m_batt_lvl_in_milli_volts %u mV",m_batt_lvl_in_milli_volts);
 			
@@ -650,12 +694,13 @@ static void saadc_event_handler(nrf_drv_saadc_evt_t const * p_evt)
 				if(bk_level <bat_level_to_st)
 				{
 					bat_level_to_st = bk_level;
-					NRF_LOG_INFO("bat_level_to_st is %u",bat_level_to_st);
+					NRF_LOG_INFO("power change bat_level_to_st is %u",bat_level_to_st);
 					power_change_flag = 0;
 				}
 			}else 
 			{
 				bat_level_to_st = calc_bat_level(m_last_volts);	
+				NRF_LOG_INFO("bat_level_to_st is %u",bat_level_to_st);
 			}												        
         }
 		
@@ -742,8 +787,9 @@ void m_100ms_timeout_hander(void * p_context)
 }
 void m_1s_timeout_hander(void * p_context)
 {
-    static uint8_t flag = 0;
+    static uint8_t long_termflag = 0;
     static uint8_t flag_ble=0;
+	static uint8_t back_storage_value = 0;
 	
     UNUSED_PARAMETER(p_context);
 
@@ -776,28 +822,36 @@ void m_1s_timeout_hander(void * p_context)
     }
     if(bat_level_to_st != 0xff)
     {
-        if(flag == 0)
+        if(long_termflag == 0)
         {
-            flag = 1;
+            long_termflag = 1;
             app_timer_stop(m_battery_timer_id);
             app_timer_start(m_battery_timer_id, BATTERY_MEAS_LONG_INTERVAL, NULL);
             NRF_LOG_INFO("Start long term time");
         }
     }
-
-    if((backup_bat_level != bat_level_to_st)||(read_flag == 1))
+    if((backup_bat_level != bat_level_to_st)||(long_termflag == 1))
     {   
     	NRF_LOG_INFO("backup_bat_level %d ",backup_bat_level);
 		NRF_LOG_INFO("bat_level_to_st %d ",bat_level_to_st);
-		read_flag =2;
+		if(long_termflag == 1)
+		{
+			long_termflag =2;
+		}
     	if(USB_CHARGE == usb_ins_flag)
     	{    		
-    		if(backup_bat_level != 0xFF)
+    		if(backup_bat_level != 0xFF && bat_level_to_st != 0xFF)
 			{
 				backup_bat_level = (bat_level_to_st-backup_bat_level>1)?(++backup_bat_level):bat_level_to_st;
     		}else
     		{
-				backup_bat_level = bat_level_to_st;
+    			if(bat_level_to_st == 0xff)
+    			{
+					bat_level_to_st = backup_bat_level;
+    			}else
+    			{
+					backup_bat_level = bat_level_to_st;
+				}
 			}
 			NRF_LOG_INFO("usb insert %d \n",backup_bat_level);
 		}else if(NO_CHARGE == usb_ins_flag)
@@ -824,11 +878,16 @@ void m_1s_timeout_hander(void * p_context)
         send_stm_data(bak_buff,bak_buff[1]);
 		if(bat_level_flag == 1)
 		{
-			bat_level_flag = 2;
+			if(back_storage_value != backup_bat_level)
+			{
+				back_storage_value = backup_bat_level;
+				bat_level_flag = 2;			
+			}
 		}else if(bat_level_flag == 0)
 		{
 			bat_level_flag = 1;
 		}
+		NRF_LOG_INFO("bat_level_flag is %d\n",bat_level_flag);
     }
 
 	if(one_second_counter == 1 && flag_ble == 0)
@@ -2359,7 +2418,7 @@ static void manage_bat_level(void *p_event_data,uint16_t event_size)
 		m_data3 = (uint32_t)backup_bat_level;
 		flash_data_write(BAT_LVL_ADDR,m_data3);
 		nrf_fstorage_read(&fstorage, BAT_LVL_ADDR, data, len);
-		NRF_LOG_INFO("buff0 %d,buff1 %d,buff2 %d,buff3 %d",data[0],data[1],data[2],data[3]);					
+		NRF_LOG_INFO("buff0- %d,buff1- %d,buff2- %d,buff3- %d",data[0],data[1],data[2],data[3]);					
     }
 }
 static void ble_ctl_process(void *p_event_data,uint16_t event_size)
