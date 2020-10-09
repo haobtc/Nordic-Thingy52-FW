@@ -102,7 +102,7 @@
 #endif
 
 #define MANUFACTURER_NAME               "Bixin"                                     /**< Manufacturer. Will be passed to Device Information Service. */
-#define ADV_HEAD_NAME                   "BixinKey"
+#define ADV_HEAD_NAME                   "K"
 #define MODEL_NUMBER                    "one"                                       /**< Model Number string. Will be passed to Device Information Service. */
 #define MANUFACTURER_ID                 0x55AA55AA55                                /**< DUMMY Manufacturer ID. Will be passed to Device Information Service. You shall use the ID for your Company*/
 #define ORG_UNIQUE_ID                   0xEEBBEE                                    /**< DUMMY Organisation Unique ID. Will be passed to Device Information Service. You shall use the Organisation Unique ID relevant for your Company */
@@ -181,8 +181,8 @@
 #define SEC_PARAM_MAX_KEY_SIZE          16                                          /**< Maximum encryption key size. */
 
 #define PASSKEY_LENGTH                  6                                           /**< Length of pass-key received by the stack for display. */
-#define HEAD_NAME_LENGTH                8
-#define ADV_NAME_LENGTH                 18
+#define HEAD_NAME_LENGTH                1
+#define ADV_NAME_LENGTH                 5
 
 #define DEAD_BEEF                       0xDEADBEEF                                  /**< Value used as error code on stack dump, can be used to identify stack location on stack unwind. */
 
