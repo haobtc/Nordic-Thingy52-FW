@@ -861,9 +861,15 @@ void m_1s_timeout_hander(void * p_context)
 				if(backup_bat_level>bat_level_to_st)
 				{
 					backup_bat_level = (backup_bat_level-bat_level_to_st>1)?(--backup_bat_level):bat_level_to_st;
-				}else
-				{
-					bat_level_to_st = backup_bat_level;
+				}else if(backup_bat_level<bat_level_to_st)
+				{					
+					if((bat_level_to_st - backup_bat_level)>=2)
+					{
+						backup_bat_level = bat_level_to_st;
+					}else
+					{
+						bat_level_to_st = backup_bat_level;
+					}
 				}
 			}else
 			{
