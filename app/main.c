@@ -93,6 +93,7 @@
 #include "nrf_fstorage_sd.h"
 #include "nrf_fstorage.h"
 #include "fds_internal_defs.h"
+#include "nrf_drv_spi.h"
 
 #if defined (UART_PRESENT)
 #include "nrf_uart.h"
@@ -277,6 +278,10 @@ static uint8_t           backup_bat_level=0xff;
 static uint8_t           usb_ins_flag=0;
 static uint16_t          count_usb_ins=0;
 
+uint8_t data_recived_buf[APDU_BUFF_SIZE];
+uint16_t data_recived_len=0;
+bool data_recived_flag=false;
+
 #ifdef BOND_ENABLE
 static pm_peer_id_t m_peer_to_be_deleted = PM_PEER_ID_INVALID;
 #endif
@@ -294,9 +299,8 @@ static void advertising_start(void);
 #ifdef SCHED_ENABLE
 static void twi_write_data(void *p_event_data,uint16_t event_size);
 #else
-static void twi_write_data(void);
+//static void twi_write_data(void);
 #endif
-static void twi_read_data(void);
 #ifdef UART_TRANS
 static volatile uint8_t flag_uart_trans=1;
 static uint8_t uart_trans_buff[30];
@@ -1408,7 +1412,7 @@ static void nus_data_handler(ble_nus_evt_t * p_evt)
                 rcv_head_flag = DATA_INIT;
             }
         }
-        twi_write_data();
+//        twi_write_data();
     }
 }
 #endif
@@ -2031,6 +2035,7 @@ static void power_management_init(void)
     ret_code_t err_code = nrf_pwr_mgmt_init();
     APP_ERROR_CHECK(err_code);
 }
+#if 0
 #ifdef SCHED_ENABLE
 static void twi_write_data(void *p_event_data,uint16_t event_size)
 {
@@ -2064,6 +2069,8 @@ static void twi_write_data(void)
     }
 }
 #endif
+#endif
+#if 0
 static void ble_resp_data(void)
 {
     ret_code_t err_code;
@@ -2112,30 +2119,7 @@ static void ble_resp_data(void)
        
     }
 }
-static void twi_read_data(void)
-{
-    uint32_t counter = 0;
-    
-    if(SEND_I2C_DATA == i2c_evt_flag)
-    {
-        i2c_master_read();
-        i2c_evt_flag = READ_I2C_HEAD;
-        while(false == data_recived_flag)
-        {
-            counter++;
-            nrf_delay_ms(1);
-            if(counter > 500)return;
-        }
-        data_recived_flag=false;
-        i2c_evt_flag = READ_I2C_DATA;
-        //response data        
-        ble_resp_data();        
-        i2c_evt_flag = DEFAULT_FLAG;		
-        RST_ONE_SECNOD_COUNTER();
-    }
-}
-
-
+#endif
 /**@brief Function for handling the idle state (main loop).
  *
  * @details If there is no pending log operation, then sleep until next the next event occurs.
@@ -2157,33 +2141,12 @@ static void idle_state_handle(void)
         nrf_pwr_mgmt_run();
     }
 }
-void in_pin_handler(nrf_drv_gpiote_pin_t pin, nrf_gpiote_polarity_t action)
-{
-    twi_read_data();
-}
-
-static void gpiote_init(void)
-{
-    ret_code_t err_code;
-
-    err_code = nrf_drv_gpiote_init();
-    APP_ERROR_CHECK(err_code);
-
-    nrf_drv_gpiote_in_config_t in_config = NRFX_GPIOTE_CONFIG_IN_SENSE_LOTOHI(true);
-    in_config.pull = NRF_GPIO_PIN_PULLUP;
-
-    err_code = nrf_drv_gpiote_in_init(TWI_STATUS_GPIO, &in_config, in_pin_handler);
-    APP_ERROR_CHECK(err_code);
-
-    nrf_drv_gpiote_in_event_enable(TWI_STATUS_GPIO, true);
-}
 
 static void gpio_init(void)
 {
     //Detect USB insert status.
     nrf_gpio_cfg_input(USB_INS_PIN,NRF_GPIO_PIN_NOPULL);
     //nrf_gpio_cfg_input(TWI_STATUS_GPIO,NRF_GPIO_PIN_PULLUP);
-    gpiote_init();
 }
 #ifdef UART_TRANS
 static uint8_t calcXor(uint8_t *buf, uint8_t len)
@@ -2501,8 +2464,7 @@ static void main_loop(void)
 {   
     app_sched_event_put(NULL,NULL,ble_ctl_process);
 	app_sched_event_put(NULL,NULL,rsp_st_uart_cmd);
-	app_sched_event_put(NULL,NULL,manage_bat_level);
-    app_sched_event_put(NULL,NULL,nfc_poll);
+	app_sched_event_put(NULL,NULL,manage_bat_level);    
 }
 
 int main(void)
@@ -2538,10 +2500,7 @@ int main(void)
     // Start execution.
     NRF_LOG_INFO("Debug logging for UART over RTT started.");
 
-    ctl_advertising();	    
-	
-    twi_master_init();
-    nfc_init();
+    ctl_advertising();	    	
 
     wdt_init();
     // Enter main loop.
