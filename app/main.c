@@ -94,6 +94,7 @@
 #include "nrf_fstorage.h"
 #include "fds_internal_defs.h"
 #include "nrf_drv_spi.h"
+#include "stm_transfer.h"
 
 #if defined (UART_PRESENT)
 #include "nrf_uart.h"
@@ -1177,6 +1178,7 @@ static void nrf_qwr_error_handler(uint32_t nrf_error)
     APP_ERROR_HANDLER(nrf_error);
 }
 
+#ifdef BUTTONLESS_ENABLED
 static void disconnect(uint16_t conn_handle, void * p_context)
 {
     UNUSED_PARAMETER(p_context);
@@ -1192,7 +1194,7 @@ static void disconnect(uint16_t conn_handle, void * p_context)
     }
 }
 
-#ifdef BUTTONLESS_ENABLED
+
 static void advertising_config_get(ble_adv_modes_config_t * p_config)
 {
     memset(p_config, 0, sizeof(ble_adv_modes_config_t));
@@ -2198,6 +2200,8 @@ static void system_init()
     gpio_init();
 #ifdef UART_TRANS    
     usr_uart_init();
+    stm_trans_init();
+    
 #endif    
 }
 
@@ -2464,7 +2468,8 @@ static void main_loop(void)
 {   
     app_sched_event_put(NULL,NULL,ble_ctl_process);
 	app_sched_event_put(NULL,NULL,rsp_st_uart_cmd);
-	app_sched_event_put(NULL,NULL,manage_bat_level);    
+	app_sched_event_put(NULL,NULL,manage_bat_level);
+    app_sched_event_put(NULL,NULL,stm_transfer);
 }
 
 int main(void)

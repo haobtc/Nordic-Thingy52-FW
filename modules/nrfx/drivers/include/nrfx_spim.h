@@ -119,7 +119,7 @@ typedef struct
     uint8_t              dcx_pin;     ///< D/CX pin number (optional).
     uint8_t              rx_delay;    ///< Sample delay for input serial data on MISO.
                                       /**< The value specifies the delay, in number of 64 MHz clock cycles
-                                       *   (15.625 ns), from the the sampling edge of SCK (leading edge for
+       1                                *   (15.625 ns), from the the sampling edge of SCK (leading edge for
                                        *   CONFIG.CPHA = 0, trailing edge for CONFIG.CPHA = 1) until
                                        *   the input serial data is sampled. */
     bool                 use_hw_ss;   ///< Indication to use software or hardware controlled Slave Select pin.
