@@ -247,6 +247,11 @@
 #define BAT_LVL_ADDR					0x70000
 #endif
 
+/////////////////////////DEBUG and TEST///////////////////////////////
+//#define DEBUG_BATTERY
+uint8_t test_spi_flag=0;
+
+
 BLE_NUS_DEF(m_nus, NRF_SDH_BLE_TOTAL_LINK_COUNT);                                   /**< BLE NUS service instance. */
 BLE_BAS_DEF(m_bas);    
 NRF_BLE_GATT_DEF(m_gatt);                                                           /**< GATT module instance. */
@@ -590,33 +595,44 @@ static void saadc_event_handler(nrf_drv_saadc_evt_t const * p_evt)
             adc_result = 1024;
         }        
 		usb_ins_flag = nrf_gpio_pin_read(USB_INS_PIN);
+		#ifdef DEBUG_BATTERY		
 		if(usb_ins_flag)
 		{
 			NRF_LOG_INFO("Usb charge mode.");
 		}
+		#endif		
 		
         err_code = nrf_drv_saadc_buffer_convert(p_evt->data.done.p_buffer,1);
         APP_ERROR_CHECK(err_code);
         m_batt_lvl_in_milli_volts = ADC_RESULT_IN_MILLI_VOLTS(adc_result);		
+		#ifdef DEBUG_BATTERY        
 		NRF_LOG_INFO("m_batt_lvl_in_milli_volts is %u mV",m_batt_lvl_in_milli_volts);
-
+		#endif
         if(m_last_volts == 0)
         {
-        	NRF_LOG_INFO("m_last_volts----0");        	
+			#ifdef DEBUG_BATTERY        
+        	NRF_LOG_INFO("m_last_volts----0");
+            #endif
 	        if(m_batt_lvl_in_milli_volts> 2000 && m_batt_lvl_in_milli_volts<3500)
 	        {
             	m_last_volts = m_batt_lvl_in_milli_volts;
-            	NRF_LOG_INFO("-2 voltage is   %u mV",m_batt_lvl_in_milli_volts);
+				#ifdef DEBUG_BATTERY            	
+            	NRF_LOG_INFO("2 voltage is   %u mV",m_batt_lvl_in_milli_volts);
+				#endif            	
             }else
             {
-            	NRF_LOG_INFO("-3 voltage is 0 mV");
+				#ifdef DEBUG_BATTERY            
+            	NRF_LOG_INFO("3 voltage is 0 mV");
+            	#endif
             	m_last_volts = 0;
             	usb_ins_flag = ERROR_STA;
             }
             if(usb_ins_flag == USB_CHARGE)
 	        {        				
 	        	m_batt_lvl_in_milli_volts -= 100;
-	        	NRF_LOG_INFO("-1 voltage is  %u mV",m_batt_lvl_in_milli_volts);
+				#ifdef DEBUG_BATTERY	        	
+	        	NRF_LOG_INFO("1 voltage is  %u mV",m_batt_lvl_in_milli_volts);
+	        	#endif
 	        }
             
         }
@@ -644,8 +660,10 @@ static void saadc_event_handler(nrf_drv_saadc_evt_t const * p_evt)
 			{
 				power_change_flag =1;
 			}
+			#ifdef DEBUG_BATTERY
 			NRF_LOG_INFO("charge adc is %u mV",m_last_volts);
 			NRF_LOG_INFO("bat_level_to_st is %d",bat_level_to_st);
+			#endif
 			count_usb_ins++;
 			if(0 == bat_level_to_st)
 			{
@@ -663,7 +681,9 @@ static void saadc_event_handler(nrf_drv_saadc_evt_t const * p_evt)
 				count_usb_ins = 0;
 				if(bat_level_to_st<4)
 				{
+					#ifdef DEBUG_BATTERY
 					NRF_LOG_INFO("increase level");
+					#endif
 					bat_level_to_st +=1;
 				}
 			}		
@@ -688,24 +708,31 @@ static void saadc_event_handler(nrf_drv_saadc_evt_t const * p_evt)
 	                	m_last_volts = m_batt_lvl_in_milli_volts;
 	                }
 	            }
-			}				
+			}
+			#ifdef DEBUG_BATTERY
 			NRF_LOG_INFO("no charge adc is %u mV",m_last_volts);
 			NRF_LOG_INFO("m_batt_lvl_in_milli_volts %u mV",m_batt_lvl_in_milli_volts);
-			
+			#endif
 			if(power_change_flag == 1)
 			{
 				bk_level = calc_bat_level(m_last_volts);
+				#ifdef DEBUG_BATTERY
 				NRF_LOG_INFO("bk_level is %u\n",bk_level);
+				#endif
 				if(bk_level <bat_level_to_st)
 				{
 					bat_level_to_st = bk_level;
+					#ifdef DEBUG_BATTERY
 					NRF_LOG_INFO("power change bat_level_to_st is %u",bat_level_to_st);
+					#endif
 					power_change_flag = 0;
 				}
 			}else 
 			{
-				bat_level_to_st = calc_bat_level(m_last_volts);	
+				bat_level_to_st = calc_bat_level(m_last_volts);
+				#ifdef DEBUG_BATTERY
 				NRF_LOG_INFO("bat_level_to_st is %u",bat_level_to_st);
+				#endif
 			}												        
         }
 		
@@ -832,13 +859,17 @@ void m_1s_timeout_hander(void * p_context)
             long_termflag = 1;
             app_timer_stop(m_battery_timer_id);
             app_timer_start(m_battery_timer_id, BATTERY_MEAS_LONG_INTERVAL, NULL);
+            #ifdef DEBUG_BATTERY
             NRF_LOG_INFO("Start long term time");
+            #endif
         }
     }
     if((backup_bat_level != bat_level_to_st)||(long_termflag == 1))
     {   
+    	#ifdef DEBUG_BATTERY
     	NRF_LOG_INFO("backup_bat_level %d ",backup_bat_level);
 		NRF_LOG_INFO("bat_level_to_st %d ",bat_level_to_st);
+		#endif
 		if(long_termflag == 1)
 		{
 			long_termflag =2;
@@ -858,7 +889,9 @@ void m_1s_timeout_hander(void * p_context)
 					backup_bat_level = bat_level_to_st;
 				}
 			}
+			#ifdef DEBUG_BATTERY
 			NRF_LOG_INFO("usb insert %d \n",backup_bat_level);
+			#endif
 		}else if(NO_CHARGE == usb_ins_flag)
 		{	
 			if(backup_bat_level != 0xFF)
@@ -879,9 +912,13 @@ void m_1s_timeout_hander(void * p_context)
 			}else
 			{
 				backup_bat_level = bat_level_to_st;
+				#ifdef DEBUG_BATTERY
 				NRF_LOG_INFO("first init",bat_level_to_st);
+				#endif
 			}
+			#ifdef DEBUG_BATTERY
 			NRF_LOG_INFO("no charge %d \n",backup_bat_level);
+			#endif
 		}
         bak_buff[0] = UART_CMD_BAT_PERCENT;
         bak_buff[1] = 0x01;
@@ -898,7 +935,9 @@ void m_1s_timeout_hander(void * p_context)
 		{
 			bat_level_flag = 1;
 		}
+		#ifdef DEBUG_BATTERY
 		NRF_LOG_INFO("bat_level_flag is %d\n",bat_level_flag);
+		#endif
     }
 
 	if(one_second_counter == 1 && flag_ble == 0)
